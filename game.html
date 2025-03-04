@@ -4,43 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Wordplay</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            text-align: center;
-            background-color: #f4f4f4;
-            padding: 20px;
-        }
-        .container {
-            max-width: 600px;
-            margin: auto;
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
-        }
-        .word-container {
-            font-size: 24px;
-            margin-top: 20px;
-            padding: 20px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            background-color: #fff;
-        }
-        button {
-            margin-top: 20px;
-            padding: 10px 20px;
-            font-size: 18px;
-            cursor: pointer;
-        }
-    </style>
+    <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-    <div class="container">
+    <div class="game-container">
         <h1>Can you work out the definition?</h1>
         <div class="word-container" onclick="showNext()">Click to Start</div>
-        <button onclick="restartGame()">Repeat Game</button>
-        <button onclick="goBack()">Back to Home</button>
+        <button class="game-button" onclick="restartGame()">Repeat Game</button>
+        <button class="game-button" onclick="goBack()">Back to Home</button>
     </div>
 
     <script>
