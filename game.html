@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Guess It Maths</title>
+  <link rel="icon" href="favicon.ico" type="image/x-icon">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="game-page">
+
+  <div class="game" id="game">
+    <div class="toolbar">
+      <a class="tbtn" href="index.html#topics">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>Topics
+      </a>
+      <h1 id="topicTitle"></h1>
+      <span class="count"><b id="left">0</b> of <span id="total">0</span> left</span>
+      <span class="spacer"></span>
+      <button class="tbtn primary" id="secretBtn">Secret card</button>
+      <button class="tbtn" id="undoBtn">Undo</button>
+      <button class="tbtn" id="resetBtn">Reset board</button>
+      <button class="tbtn" id="namesBtn" aria-pressed="false">Names</button>
+      <button class="tbtn" id="promptsBtn" aria-pressed="true">Prompts</button>
+      <button class="tbtn" id="fsBtn">Full screen</button>
+    </div>
+
+    <div class="layout">
+      <div class="board" id="board"></div>
+
+      <aside class="prompts" aria-label="Question prompts">
+        <h2>Question ideas</h2>
+        <div class="tabs" role="tablist">
+          <button role="tab" aria-selected="true" data-tab="warm">Warm-up</button>
+          <button role="tab" aria-selected="false" data-tab="stretch">Stretch</button>
+        </div>
+        <ul id="promptList"></ul>
+        <div class="challenge">
+          <p id="challengeText"></p>
+          <button id="challengeBtn">New challenge</button>
+        </div>
+        <div class="tally">
+          <span>Questions asked: <b id="qCount">0</b></span>
+          <span>
+            <button class="tbtn" id="qMinus" aria-label="One fewer question">−</button>
+            <button class="tbtn" id="qPlus" aria-label="One more question">+</button>
+          </span>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <div class="missing" id="missing" hidden>
+    <h1>Topic not found</h1>
+    <p class="muted">This board doesn’t exist yet. Choose a topic from the home page.</p>
+    <p><a class="btn primary" href="index.html#topics">Choose a topic</a></p>
+  </div>
+
+  <dialog id="secretDlg">
+    <h2>Secret card</h2>
+    <p id="secretStatus"></p>
+    <div class="row">
+      <button class="tbtn primary" id="pickRandom">Pick at random</button>
+      <button class="tbtn" id="peekBtn" hidden>Hold to peek</button>
+      <button class="tbtn" id="revealBtn" hidden>Reveal</button>
+      <button class="tbtn" id="closeSecret">Close</button>
+    </div>
+    <div class="peek" id="peek" aria-hidden="true"><div class="reveal-card" id="peekCard"></div></div>
+  </dialog>
+
+  <dialog id="revealDlg">
+    <div class="reveal-card" id="revealCard"></div>
+    <h2 id="revealTitle" style="text-align:center"></h2>
+    <p id="revealNote" style="text-align:center"></p>
+    <div class="row" style="justify-content:center">
+      <button class="tbtn primary" id="playAgain">New round</button>
+      <button class="tbtn" id="closeReveal">Close</button>
+    </div>
+  </dialog>
+
+  <script src="cards.js"></script>
+  <script>
+  (() => {
+    const { TOPICS } = window.GIM;
+    const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+    // Which topic? game.html?topic=numbers
+    const topicKey = new URLSearchParams(location.search).get('topic');
+    const T = TOPICS[topicKey];
+    if (!T) {
+      document.getElementById('game').hidden = true;
+      document.getElementById('missing').hidden = false;
+      return;
+    }
+
+    const frontHTML = i => {
+      const c = T.cards[i];
+      const art = c.svg || `<img src="${c.img}" alt="">`;
+      return `<span class="face front">${art}<span class="tag">${LETTERS[i]}</span><span class="name">${c.name}</span></span>`;
+    };
+
+    // ---------- saved state (each topic remembers its own board) ----------
+    const KEY = 'guessitmaths:' + topicKey;
+    let state = { down: [], history: [], secret: null, questions: 0, names: false, prompts: true };
+    try { const s = JSON.parse(localStorage.getItem(KEY)); if (s) state = Object.assign(state, s); } catch (e) {}
+    const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} };
+
+    // ---------- build the board ----------
+    document.title = `${T.title} · Guess It Maths`;
+    document.getElementById('topicTitle').textContent = T.title;
+    document.getElementById('total').textContent = T.cards.length;
+    const namesBtn = document.getElementById('namesBtn');
+    if (T.namesLabel) namesBtn.textContent = T.namesLabel; else namesBtn.hidden = true;
+
+    const board = document.getElementById('board');
+    board.innerHTML = T.cards.map((c, i) =>
+      `<button class="card" data-i="${i}" aria-pressed="false" aria-label="Card ${LETTERS[i]}">
+         <span class="flip">${frontHTML(i)}<span class="face back">${LETTERS[i]}</span></span>
+       </button>`).join('');
+    const cards = [...board.children];
+
+    function render() {
+      const down = new Set(state.down);
+      cards.forEach((c, i) => {
+        const d = down.has(i);
+        c.classList.toggle('down', d);
+        c.setAttribute('aria-pressed', String(d));
+        c.setAttribute('aria-label', `Card ${LETTERS[i]}${d ? ', turned down' : ''}`);
+      });
+      document.getElementById('left').textContent = cards.length - down.size;
+      document.getElementById('qCount').textContent = state.questions;
+      document.body.classList.toggle('show-names', state.names && !!T.namesLabel);
+      document.body.classList.toggle('no-prompts', !state.prompts);
+      namesBtn.setAttribute('aria-pressed', String(state.names));
+      document.getElementById('promptsBtn').setAttribute('aria-pressed', String(state.prompts));
+      document.getElementById('undoBtn').disabled = !state.history.length;
+    }
+
+    // ---------- turning cards ----------
+    function flipState(i) {
+      const idx = state.down.indexOf(i);
+      if (idx >= 0) state.down.splice(idx, 1); else state.down.push(i);
+    }
+    function toggle(i) {
+      flipState(i);
+      state.history.push(i);
+      if (state.history.length > 200) state.history.shift();
+      save(); render();
+      if (cards.length - state.down.length === 1 && state.secret !== null) {
+        setTimeout(() => showReveal(true), 500);
+      }
+    }
+    board.addEventListener('click', e => {
+      const c = e.target.closest('.card');
+      if (c) toggle(Number(c.dataset.i));
+    });
+
+    document.getElementById('undoBtn').onclick = () => {
+      const i = state.history.pop();
+      if (i === undefined) return;
+      flipState(i);
+      save(); render();
+    };
+    function newRound() {
+      Object.assign(state, { down: [], history: [], secret: null, questions: 0 });
+      save(); render();
+    }
+    document.getElementById('resetBtn').onclick = () => {
+      if (!state.down.length || confirm('Turn every card face up and start a new round?')) newRound();
+    };
+    namesBtn.onclick = () => { state.names = !state.names; save(); render(); };
+    document.getElementById('promptsBtn').onclick = () => { state.prompts = !state.prompts; save(); render(); };
+    document.getElementById('fsBtn').onclick = () => {
+      if (document.fullscreenElement) document.exitFullscreen();
+      else document.documentElement.requestFullscreen?.();
+    };
+    document.getElementById('qPlus').onclick = () => { state.questions++; save(); render(); };
+    document.getElementById('qMinus').onclick = () => { state.questions = Math.max(0, state.questions - 1); save(); render(); };
+
+    // ---------- prompts ----------
+    let tab = 'warm', ch = 0;
+    function renderPrompts() {
+      document.getElementById('promptList').innerHTML = T.prompts[tab].map(p => `<li>${p}</li>`).join('');
+      document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === tab)));
+      document.getElementById('challengeText').textContent = T.challenges[ch % T.challenges.length];
+    }
+    document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => { tab = b.dataset.tab; renderPrompts(); });
+    document.getElementById('challengeBtn').onclick = () => { ch++; renderPrompts(); };
+
+    // ---------- secret card ----------
+    const secretDlg = document.getElementById('secretDlg');
+    const peekBtn = document.getElementById('peekBtn');
+    const revealBtn = document.getElementById('revealBtn');
+    const peek = document.getElementById('peek');
+
+    function updateSecretDlg() {
+      const has = state.secret !== null;
+      document.getElementById('secretStatus').textContent = has
+        ? 'A secret card has been chosen. Hold the peek button to check it privately.'
+        : 'No secret card yet. Let a student choose one, or have the game pick at random.';
+      document.getElementById('pickRandom').textContent = has ? 'Pick a different card' : 'Pick at random';
+      peekBtn.hidden = revealBtn.hidden = !has;
+    }
+    document.getElementById('secretBtn').onclick = () => { updateSecretDlg(); secretDlg.showModal(); };
+    document.getElementById('closeSecret').onclick = () => secretDlg.close();
+    document.getElementById('pickRandom').onclick = () => {
+      state.secret = Math.floor(Math.random() * cards.length);
+      save(); updateSecretDlg();
+    };
+    const showPeek = () => {
+      if (state.secret === null) return;
+      document.getElementById('peekCard').innerHTML = frontHTML(state.secret);
+      peek.classList.add('show');
+    };
+    const hidePeek = () => peek.classList.remove('show');
+    peekBtn.addEventListener('pointerdown', showPeek);
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => peekBtn.addEventListener(ev, hidePeek));
+    peekBtn.addEventListener('keydown', e => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); showPeek(); } });
+    peekBtn.addEventListener('keyup', hidePeek);
+    window.addEventListener('pointerup', hidePeek);
+
+    const revealDlg = document.getElementById('revealDlg');
+    function showReveal(auto) {
+      if (state.secret === null) return;
+      secretDlg.close();
+      const i = state.secret;
+      const left = cards.map((_, k) => k).filter(k => !state.down.includes(k));
+      document.getElementById('revealCard').innerHTML = frontHTML(i);
+      document.getElementById('revealTitle').textContent = `Card ${LETTERS[i]}: ${T.cards[i].title}`;
+      let note = `${state.questions} question${state.questions === 1 ? '' : 's'} asked.`;
+      if (auto) {
+        note = left.length === 1 && left[0] === i
+          ? `Got it! ${note}`
+          : `The last card standing is ${LETTERS[left[0]]}, so a question was answered wrongly somewhere. Worth a class discussion!`;
+      }
+      document.getElementById('revealNote').textContent = note;
+      revealDlg.showModal();
+    }
+    revealBtn.onclick = () => showReveal(false);
+    document.getElementById('closeReveal').onclick = () => revealDlg.close();
+    document.getElementById('playAgain').onclick = () => { revealDlg.close(); newRound(); };
+
+    renderPrompts();
+    render();
+  })();
+  </script>
+</body>
+</html>

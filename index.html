@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Guess It Maths</title>
+  <meta name="description" content="A Guess Who-style classroom game for secondary maths. Pick a topic, put the board on the screen, and let students ask the questions.">
+  <link rel="icon" href="favicon.ico" type="image/x-icon">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <header class="site-nav page">
+    <a class="brand" href="index.html">Guess It Maths</a>
+    <nav aria-label="Main">
+      <a href="index.html" aria-current="page">Topics</a>
+      <a href="guidance.html">For teachers</a>
+      <a href="about.html">About us</a>
+    </nav>
+  </header>
+
+  <main class="page">
+    <section class="hero">
+      <div>
+        <h1><span class="hl">Guess It</span><br>Maths</h1>
+        <p class="lead">A Guess Who-style game for the maths classroom. Put a board on the screen, let one student pick a secret card, and the class asks questions until only one card is left.</p>
+      </div>
+      <div class="hero-art" aria-hidden="true" id="heroArt"></div>
+    </section>
+
+    <section id="topics">
+      <h2>Choose a topic</h2>
+      <div class="topics">
+        <a class="topic" href="game.html?topic=numbers"><strong>Numbers</strong><span>24 numbers, KS3</span></a>
+        <a class="topic" href="game.html?topic=polygons"><strong>Polygons</strong><span>24 shapes, KS3</span></a>
+        <a class="topic" href="game.html?topic=fractions"><strong>Fractions</strong><span>24 fractions, KS3</span></a>
+        <a class="topic" href="game.html?topic=graphs"><strong>Graphs</strong><span>24 graphs, KS3–4</span></a>
+        <a class="topic" href="game.html?topic=algebra"><strong>Algebraic manipulation</strong><span>24 expressions, KS3–4</span></a>
+        <a class="topic" href="game.html?topic=sequences"><strong>Sequences</strong><span>24 sequences, KS3–4</span></a>
+        <div class="topic soon"><strong>Proof</strong><span>Coming soon</span></div>
+        <div class="topic soon"><strong>History of maths</strong><span>Coming soon</span></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>How to play</h2>
+      <ol class="steps">
+        <li><h3>Pick a secret card</h3><p>Invite a student to the board to choose a card and show it only to you, or let the game pick one at random.</p></li>
+        <li><h3>Ask yes/no questions</h3><p>Students write a question on mini whiteboards. Choose one, answer it, and tap every card it rules out.</p></li>
+        <li><h3>Guess the card</h3><p>When one card is left, reveal the secret. Fewer questions means a better round.</p></li>
+      </ol>
+    </section>
+
+    <section class="prose">
+      <h2>For teachers</h2>
+      <p class="muted">Ideas for running the game in lessons, prompt sheets for each topic, and ways to support or stretch different groups.</p>
+      <p><a class="btn" href="guidance.html">Read the teacher guidance</a></p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="page">
+      <span>© 2025 S. Tomlin &amp; E. Pettigrew</span>
+      <span><a href="about.html#contact">Get in touch</a></span>
+    </div>
+  </footer>
+
+  <script src="cards.js"></script>
+  <script>
+    // Hero: one face-up card from each drawn topic, with two face-down cards
+    const { SHAPES, shapeSVG, numberSVG, fractionSVG } = window.GIM;
+    const hero = [shapeSVG(SHAPES[6]), null, numberSVG(36), fractionSVG([3, 4]), null, shapeSVG(SHAPES[19])];
+    document.getElementById('heroArt').innerHTML = hero.map(svg =>
+      svg ? `<div class="mini">${svg}</div>` : '<div class="mini down"></div>').join('');
+  </script>
+</body>
+</html>
