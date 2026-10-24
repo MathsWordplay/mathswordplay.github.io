@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;0,7..72,700;1,7..72,500&family=Public+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <title>Practise · Mathematical Wordplay</title>
+</head>
+<body>
+
+  <header class="site-nav page">
+    <a class="brand" href="index.html">Mathematical <em>Wordplay</em></a>
+    <nav aria-label="Main">
+      <a href="index.html">Practise</a>
+      <a href="about.html">How to use it</a>
+    </nav>
+  </header>
+
+  <main class="page play" id="app">
+    <div class="play-head">
+      <h1 id="title"></h1>
+      <a class="back" href="index.html">Choose another topic</a>
+    </div>
+
+    <div class="options">
+      <div class="seg" role="group" aria-label="Question style">
+        <button id="modeTerm" aria-pressed="true">Word, then meaning</button>
+        <button id="modeDef" aria-pressed="false">Meaning, then word</button>
+      </div>
+      <label class="toggle"><input type="checkbox" id="writeFirst"> Write my answer first</label>
+    </div>
+
+    <div class="scorebar">
+      <div class="progress" aria-hidden="true"><div class="y" id="barY" style="width:0"></div><div class="n" id="barN" style="width:0"></div></div>
+      <div class="tally" aria-live="polite">
+        <span class="y" id="tY">✓ 0</span>
+        <span class="n" id="tN">✗ 0</span>
+        <span class="s" id="tS">Streak 0</span>
+      </div>
+      <div class="count" id="count"></div>
+    </div>
+
+    <div class="card" id="card"></div>
+  </main>
+
+  <div class="page missing" id="missing" hidden style="padding-top:60px;padding-bottom:60px">
+    <h1>Topic not found</h1>
+    <p class="muted">Choose a topic and level from the home page.</p>
+    <p><a class="btn primary" href="index.html">Choose a topic</a></p>
+  </div>
+
+  <footer class="site-footer">
+    <div class="page">
+      <span>Keys: <kbd>Space</kbd> reveal, <kbd>Y</kbd> yes, <kbd>N</kbd> not quite</span>
+      <a href="about.html">How to use it</a>
+    </div>
+  </footer>
+
+  <script src="terms.js"></script>
+  <script>
+  (() => {
+    const W = window.WORDPLAY;
+    const ORDER = ['KS3', 'KS4', 'KS5'];
+    const params = new URLSearchParams(location.search);
+    const topicId = params.get('topic');
+    const level = params.get('level');
+    const topics = topicId === 'all' ? W.topics : W.topics.filter(t => t.id === topicId);
+
+    // ---------- build the deck ----------
+    const levelsUpTo = ORDER.slice(0, ORDER.indexOf(level) + 1);
+    let deck = [];
+    if (ORDER.includes(level)) {
+      topics.forEach(t => levelsUpTo.forEach(l => (t[l] || []).forEach(([term, def]) =>
+        deck.push({ term, def, topic: t.name, level: l }))));
+    }
+    if (!deck.length) {
+      document.getElementById('app').hidden = true;
+      document.getElementById('missing').hidden = false;
+      return;
+    }
+    const deckName = (topicId === 'all' ? 'All topics' : topics[0].name) + ' ' + level;
+    document.title = deckName + ' · Mathematical Wordplay';
+    document.getElementById('title').textContent = deckName;
+    const BEST_KEY = 'wordplay:best:' + topicId + ':' + level;
+
+    const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+    const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+    // ---------- settings ----------
+    const store = {
+      get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+      set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+    };
+    let mode = store.get('wordplay:mode', 'term');       // 'term' or 'def'
+    let writeFirst = store.get('wordplay:write', false);
+
+    // ---------- round state ----------
+    let round, idx, yes, no, streak, bestStreak, revealed, missed;
+    function start(cards) {
+      round = shuffle(cards.slice());
+      idx = 0; yes = 0; no = 0; streak = 0; bestStreak = 0; missed = [];
+      show();
+    }
+
+    const card = document.getElementById('card');
+
+    function updateScore() {
+      const done = yes + no;
+      document.getElementById('barY').style.width = (yes / round.length * 100) + '%';
+      document.getElementById('barN').style.width = (no / round.length * 100) + '%';
+      document.getElementById('tY').textContent = '✓ ' + yes;
+      document.getElementById('tN').textContent = '✗ ' + no;
+      document.getElementById('tS').textContent = 'Streak ' + streak;
+      document.getElementById('count').textContent = done < round.length
+        ? `Word ${idx + 1} of ${round.length}`
+        : `All ${round.length} words done`;
+    }
+
+    function show() {
+      revealed = false;
+      updateScore();
+      if (idx >= round.length) return finish();
+      const c = round[idx];
+      const prompt = mode === 'term'
+        ? `<h2 class="prompt-word">${esc(c.term)}</h2>`
+        : `<p class="prompt-def">${esc(c.def)}</p>`;
+      const placeholder = mode === 'term' ? 'Write the definition…' : 'Write the word…';
+      card.innerHTML = `
+        <div class="meta">${esc(c.topic)}, ${c.level}${mode === 'def' ? '. Which word is this?' : '. What does it mean?'}</div>
+        ${prompt}
+        ${writeFirst ? `<textarea id="attempt" placeholder="${placeholder}" aria-label="Your answer"></textarea>` : ''}
+        <div class="actions">
+          <button class="btn primary" id="reveal">Reveal ${mode === 'term' ? 'definition' : 'word'}</button>
+          <button class="btn" id="skip">Skip</button>
+          <span class="hint">Say it out loud or write it, then reveal.</span>
+        </div>
+        <div id="answerArea"></div>`;
+      document.getElementById('reveal').onclick = reveal;
+      document.getElementById('skip').onclick = () => { round.push(round.splice(idx, 1)[0]); show(); };
+      const ta = document.getElementById('attempt');
+      if (ta) ta.focus();
+    }
+
+    function reveal() {
+      if (revealed) return;
+      revealed = true;
+      const c = round[idx];
+      const ta = document.getElementById('attempt');
+      const attempt = ta ? ta.value.trim() : '';
+      if (ta) ta.readOnly = true;
+      document.querySelector('.actions').remove();
+      document.getElementById('answerArea').innerHTML = `
+        <div class="answer">
+          <div class="label">${mode === 'term' ? 'Definition' : 'Word'}</div>
+          <div class="text${mode === 'def' ? ' word' : ''}">${esc(mode === 'term' ? c.def : c.term)}</div>
+          ${attempt ? `<div class="yours"><div class="label">You wrote</div>${esc(attempt)}</div>` : ''}
+        </div>
+        <div class="judge">
+          <p>Did you get it?</p>
+          <div class="actions" style="margin-top:0">
+            <button class="btn yes" id="gotYes">Yes <kbd>Y</kbd></button>
+            <button class="btn no" id="gotNo">Not quite <kbd>N</kbd></button>
+          </div>
+          <p class="small">Only say yes if you used the key words. Close isn’t quite.</p>
+        </div>`;
+      document.getElementById('gotYes').onclick = () => judge(true);
+      document.getElementById('gotNo').onclick = () => judge(false);
+      document.getElementById('gotYes').focus();
+    }
+
+    function judge(ok) {
+      if (!revealed) return;
+      if (ok) { yes++; streak++; bestStreak = Math.max(bestStreak, streak); }
+      else { no++; streak = 0; missed.push(round[idx]); }
+      idx++;
+      show();
+    }
+
+    function finish() {
+      const pct = Math.round(yes / round.length * 100);
+      const fullDeck = round.length === deck.length;
+      let note = '';
+      if (fullDeck) {
+        const prev = store.get(BEST_KEY, null);
+        if (prev === null || pct > prev) { store.set(BEST_KEY, pct); note = prev === null ? 'Your first score on this list.' : `A new best, up from ${prev}%.`; }
+        else note = `Your best is ${prev}%.`;
+      }
+      card.innerHTML = `
+        <div class="summary">
+          <h2>${pct === 100 ? 'Every word, perfectly.' : 'Round complete'}</h2>
+          <div class="big-score">${pct}%</div>
+          <p class="muted" style="margin:0">${yes} of ${round.length} correct. Longest streak: ${bestStreak}. ${note}</p>
+          <div class="actions">
+            ${missed.length ? '<button class="btn primary" id="retryMissed">Practise the ' + missed.length + ' I missed</button>' : ''}
+            <button class="btn${missed.length ? '' : ' primary'}" id="again">Start again</button>
+            <a class="btn" href="index.html">Choose another topic</a>
+          </div>
+          ${missed.length ? `<h3 style="margin-top:32px">Words to review</h3>
+            <ul class="review">${missed.map(m => `<li><strong>${esc(m.term)}</strong><p>${esc(m.def)}</p></li>`).join('')}</ul>` : ''}
+        </div>`;
+      const rm = document.getElementById('retryMissed');
+      if (rm) rm.onclick = () => start(missed);
+      document.getElementById('again').onclick = () => start(deck);
+    }
+
+    // ---------- options ----------
+    const modeTerm = document.getElementById('modeTerm');
+    const modeDef = document.getElementById('modeDef');
+    const writeBox = document.getElementById('writeFirst');
+    function syncOptions() {
+      modeTerm.setAttribute('aria-pressed', String(mode === 'term'));
+      modeDef.setAttribute('aria-pressed', String(mode === 'def'));
+      writeBox.checked = writeFirst;
+    }
+    modeTerm.onclick = () => { mode = 'term'; store.set('wordplay:mode', mode); syncOptions(); if (idx < round.length) show(); };
+    modeDef.onclick = () => { mode = 'def'; store.set('wordplay:mode', mode); syncOptions(); if (idx < round.length) show(); };
+    writeBox.onchange = () => { writeFirst = writeBox.checked; store.set('wordplay:write', writeFirst); if (idx < round.length && !revealed) show(); };
+
+    // ---------- keyboard ----------
+    document.addEventListener('keydown', e => {
+      const typing = e.target.tagName === 'TEXTAREA' && !e.target.readOnly;
+      if (typing) {
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); reveal(); }
+        return;
+      }
+      if (e.target.tagName === 'BUTTON' && (e.key === ' ' || e.key === 'Enter')) return; // let buttons work normally
+      if (idx >= round.length) return;
+      if (!revealed && (e.key === ' ' || e.key === 'Enter')) { e.preventDefault(); reveal(); }
+      else if (revealed && (e.key === 'y' || e.key === 'Y' || e.key === 'ArrowRight')) judge(true);
+      else if (revealed && (e.key === 'n' || e.key === 'N' || e.key === 'ArrowLeft')) judge(false);
+    });
+
+    syncOptions();
+    start(deck);
+  })();
+  </script>
+</body>
+</html>

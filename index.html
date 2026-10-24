@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;0,7..72,700;1,7..72,500&family=Public+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <title>Mathematical Wordplay</title>
+  <meta name="description" content="Practise precise GCSE and A Level maths definitions, topic by topic, and keep score as you go.">
+</head>
+<body>
+
+  <header class="site-nav page">
+    <a class="brand" href="index.html">Mathematical <em>Wordplay</em></a>
+    <nav aria-label="Main">
+      <a href="index.html" aria-current="page">Practise</a>
+      <a href="about.html">How to use it</a>
+    </nav>
+  </header>
+
+  <main class="page">
+    <section class="hero">
+      <div>
+        <h1>Know the words. Earn the marks.</h1>
+        <p class="lead">See a maths term, say its definition, then check yourself against the exam-style wording. Be honest, and keep score.</p>
+      </div>
+      <div class="entry" aria-hidden="true">
+        <div class="meta">Geometry, KS4</div>
+        <div class="word">Co-interior angles</div>
+        <div class="def">Angles on the same side of a transversal, between two parallel lines. They add up to 180°.</div>
+        <div class="ask">Did you get it? <span class="y">Yes</span><span class="n">Not quite</span></div>
+      </div>
+    </section>
+
+    <section aria-labelledby="choose">
+      <h2 id="choose" style="margin-bottom:8px">Choose a topic</h2>
+      <p class="muted" style="margin:0 0 22px;max-width:60ch">Each level includes every word from the levels before it, so Geometry KS4 tests KS3 and KS4 words together.</p>
+      <div class="topic-table" id="topicTable"></div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="page">
+      <span>© 2026 Sam Tomlin</span>
+      <a href="https://snapsbysam.github.io/">More maths projects</a>
+    </div>
+  </footer>
+
+  <script src="terms.js"></script>
+  <script>
+  (() => {
+    const W = window.WORDPLAY;
+    const ORDER = ['KS3', 'KS4', 'KS5'];
+    const best = key => { try { return localStorage.getItem('wordplay:best:' + key); } catch (e) { return null; } };
+
+    // cumulative count of terms up to and including a level
+    const countUpTo = (topics, level) => topics.reduce((sum, t) =>
+      sum + ORDER.slice(0, ORDER.indexOf(level) + 1).reduce((s, l) => s + (t[l] ? t[l].length : 0), 0), 0);
+
+    function row(name, topicId, topics) {
+      const cells = ORDER.map(level => {
+        const has = topics.some(t => t[level]);
+        if (!has) return '<div class="level empty"></div>';
+        const n = countUpTo(topics, level);
+        const b = best(topicId + ':' + level);
+        return `<a class="level" href="play.html?topic=${topicId}&level=${level}">
+          <strong>${W.levels[level].name}</strong>
+          <span>${W.levels[level].detail}, ${n} words</span>
+          ${b !== null ? `<span class="best">Best ${b}%</span>` : ''}
+        </a>`;
+      }).join('');
+      return `<div class="topic-row"><h3>${name}</h3><div class="levels">${cells}</div></div>`;
+    }
+
+    document.getElementById('topicTable').innerHTML =
+      W.topics.map(t => row(t.name, t.id, [t])).join('') +
+      row('All topics', 'all', W.topics);
+  })();
+  </script>
+</body>
+</html>
